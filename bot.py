@@ -1,27 +1,19 @@
 import os
 import re
-import time
 import requests
-from telethon import TelegramClient, events
+from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
-# قراءة المتغيرات البيئية بأمان من Railway
-API_ID = int(os.getenv("API_ID", "0"))
-API_HASH = os.getenv("API_HASH", "")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-BINANCE_COOKIE = os.getenv("BINANCE_COOKIE", "")
-
-if not BOT_TOKEN or not API_ID:
-    print("خطأ: يرجى التأكد من إضافة BOT_TOKEN و API_ID في المتغيرات البيئية على Railway.")
-
-# إنشاء عميل البوت
-client = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+# جلب التوكن والكوكي من المتغيرات البيئية
+BOT_TOKEN = os.getenv("BOT_TOKEN", "حط_التوكن_هنا")
+BINANCE_COOKIE = os.getenv("BINANCE_COOKIE", "حط_الكوكي_هنا")
 
 def claim_red_packet(code):
     url = "https://www.binance.com/bapi/pay/v1/private/camp/gift-code/red-packet-claim"
     headers = {
         "Content-Type": "application/json",
         "Cookie": BINANCE_COOKIE,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        "User-Agent": "Mozilla/5.0"
     }
     data = {"redPacketCode": code}
     try:
@@ -34,15 +26,16 @@ def claim_red_packet(code):
     except Exception as e:
         print(f"❌ خطأ في الاتصال مع بينانس: {e}")
 
-@client.on(events.NewMessage)
-async def handler(event):
-    text = event.raw_text
-    # البحث عن أكواد الظروف الحمراء لبينانس (عادة تبدأ بـ BP أو تتكون من حروف وأرقام معينة)
-    match = re.search(r'(BP[A-Z0-9]{8,10})', text)
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text or update.message.caption or ""
+    match = re.search(r'(BP[A-Z0-9]{8,10})', message_text)
     if match:
         code = match.group(1)
-        print(f"🎯 تم العثور على كود ظرف أحمر: {code}")
+        print(f"🎯 تم العثور على كود: {code}")
         claim_red_packet(code)
 
-print("🚀 بدأ تشغيل بوت قنص الظروف الحمراء بنجاح وهو يراقب الآن...")
-client.run_until_disconnected()
+if __name__ == '__main__':
+    print("🚀 جاري بدء تشغيل البوت...")
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    app.run_polling()
